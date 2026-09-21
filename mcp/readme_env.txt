@@ -1,0 +1,1 @@
+Caro usuário desse sistema, por favor, renomeie este arquivo para .env para rodar o projeto localmente com a sua chave.

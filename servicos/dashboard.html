@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CineTicket - Gestão Pro</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --accent: #3b82f6;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+        }
+
+        header {
+            background-color: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border);
+            padding: 24px 5%;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        header h1 {
+            font-size: 1.8rem;
+            background: linear-gradient(90deg, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        header p { color: var(--text-muted); font-size: 0.95rem; margin-top: 5px;}
+
+        .dashboard-container {
+            max-width: 1400px;
+            margin: 30px auto;
+            padding: 0 5%;
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+        }
+
+        /* LAYOUT AJUSTADO: Coluna da esquerda mais larga e simétrica */
+        .top-section {
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            gap: 30px;
+        }
+
+        .metrics-col {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .charts-col {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* CARDS MAIORES E ESTICADOS */
+        .metric-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 30px 24px;
+            border-left: 4px solid var(--accent);
+            flex: 1; /* Faz o card preencher o espaço vertical por igual */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .metric-title { color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; font-weight: 600; margin-bottom: 10px;}
+        .metric-value { font-size: 2.4rem; font-weight: 700; }
+
+        .panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chart-container { position: relative; height: 300px; width: 100%; flex: 1; }
+        
+        h2.panel-title {
+            font-size: 1.1rem;
+            color: var(--text-main);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        h2.panel-title::before { content: ''; width: 6px; height: 20px; background-color: var(--accent); border-radius: 3px; }
+
+        .carousel-container {
+            display: flex;
+            gap: 20px;
+            overflow-x: auto;
+            padding-bottom: 15px;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border) transparent;
+        }
+        .carousel-container::-webkit-scrollbar { height: 8px; }
+        .carousel-container::-webkit-scrollbar-thumb { background-color: var(--border); border-radius: 4px; }
+
+        .poster-card {
+            flex: 0 0 auto;
+            width: 180px;
+            height: 270px;
+            background-color: #334155;
+            border-radius: 10px;
+            background-size: cover;
+            background-position: center;
+            border: 1px solid var(--border);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .poster-fallback {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(15, 23, 42, 0.85);
+            color: white;
+            padding: 10px;
+            font-size: 0.9rem;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .table-responsive { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; white-space: nowrap; }
+        th, td { padding: 14px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: rgba(15, 23, 42, 0.6); color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; }
+        .status-badge { padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; }
+        .status-badge.CONFIRMADO { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+        .status-badge.UTILIZADO { background: rgba(59, 130, 246, 0.2); color: var(--accent); }
+        .status-badge.CANCELADO { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+
+        @media (max-width: 900px) {
+            .top-section { grid-template-columns: 1fr; }
+            .metrics-col { flex-direction: row; flex-wrap: wrap; }
+            .metric-card { flex: 1 1 200px; padding: 20px; }
+            .metric-value { font-size: 2rem; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>CineTicket</h1>
+    <p>Gestão de Bilheteria • Inteligência e Métricas em Tempo Real</p>
+</header>
+
+<main class="dashboard-container">
+    
+    <section class="top-section">
+        <div class="metrics-col">
+            <div class="metric-card">
+                <div class="metric-title">Ingressos Vendidos</div>
+                <div class="metric-value" id="totalTickets">--</div>
+            </div>
+            <div class="metric-card" style="border-left-color: var(--success);">
+                <div class="metric-title">Faturamento Total</div>
+                <div class="metric-value" id="totalRevenue" style="color: var(--success);">--</div>
+            </div>
+            <div class="metric-card" style="border-left-color: var(--warning);">
+                <div class="metric-title">Sessões Lotadas</div>
+                <div class="metric-value" id="fullSessionsCount" style="color: var(--warning);">--</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">Filmes em Cartaz</div>
+                <div class="metric-value" id="activeMovies">--</div>
+            </div>
+        </div>
+
+        <div class="charts-col">
+            <div class="panel">
+                <h2 class="panel-title">Status da Bilheteria</h2>
+                <div class="chart-container" style="height: 250px;"><canvas id="ticketsStatusChart"></canvas></div>
+            </div>
+            <div class="panel">
+                <h2 class="panel-title">Assentos Livres por Sessão</h2>
+                <div class="chart-container" style="height: 250px;"><canvas id="sessionOccupancyChart"></canvas></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="panel">
+        <h2 class="panel-title">Catálogo</h2>
+        <div class="carousel-container" id="movieCarousel">
+            <div style="padding: 20px; color: var(--text-muted);">Carregando catálogo...</div>
+        </div>
+    </section>
+
+    <section class="panel">
+        <h2 class="panel-title">Duração dos Filmes (Catálogo)</h2>
+        <div class="chart-container"><canvas id="moviesChart"></canvas></div>
+    </section>
+
+    <section class="panel">
+        <h2 class="panel-title">Últimos Ingressos Emitidos</h2>
+        <div class="table-responsive" id="ticketsTable"></div>
+    </section>
+
+</main>
+
+<script>
+    Chart.defaults.color = '#94a3b8';
+    Chart.defaults.borderColor = '#334155';
+
+    const API = {
+        filmes: "http://localhost:7001/filmes",
+        sessoes: "http://localhost:7002/sessoes",
+        ingressos: "http://localhost:7003/ingressos"
+    };
+
+    let filmesData = [], sessoesData = [], ingressosData = [];
+
+    async function fetchJson(url) {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Falha HTTP`);
+        return response.json();
+    }
+
+    async function loadData() {
+        try {
+            const [filmesReq, sessoesReq, ingressosReq] = await Promise.all([
+                fetchJson(API.filmes), fetchJson(API.sessoes), fetchJson(API.ingressos)
+            ]);
+            filmesData = filmesReq; sessoesData = sessoesReq; ingressosData = ingressosReq;
+
+            updateCards();
+            renderCarousel();
+            renderTicketsStatusChart();
+            renderSessionOccupancyChart();
+            renderMoviesChart();
+            renderTicketsTable();
+        } catch (error) {
+            console.error("Erro na API:", error);
+        }
+    }
+
+    function updateCards() {
+        const validTickets = ingressosData.filter(i => i.status_ingresso !== 'CANCELADO');
+        document.getElementById("totalTickets").textContent = validTickets.length;
+        const totalRevenue = validTickets.reduce((sum, t) => sum + Number(t.preco_pago), 0);
+        document.getElementById("totalRevenue").textContent = totalRevenue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+        document.getElementById("fullSessionsCount").textContent = sessoesData.filter(s => s.status === 'LOTADA').length;
+        document.getElementById("activeMovies").textContent = filmesData.length;
+    }
+
+    function renderCarousel() {
+        const carouselHtml = filmesData.map(f => `
+            <div class="poster-card" style="background-image: url('img/${f.filme_id}.jpg');">
+                <div class="poster-fallback">${f.titulo}</div>
+            </div>
+        `).join("");
+        document.getElementById("movieCarousel").innerHTML = carouselHtml;
+    }
+
+    function renderTicketsStatusChart() {
+        const statusCount = {};
+        ingressosData.forEach(t => statusCount[t.status_ingresso] = (statusCount[t.status_ingresso] || 0) + 1);
+        new Chart(document.getElementById("ticketsStatusChart"), {
+            type: "doughnut",
+            data: { labels: Object.keys(statusCount), datasets: [{ data: Object.values(statusCount), backgroundColor: ['#10b981', '#3b82f6', '#ef4444'], borderWidth: 0 }] },
+            options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: "right" } } }
+        });
+    }
+
+    function renderSessionOccupancyChart() {
+        const sorted = [...sessoesData].sort((a, b) => b.assentos_livres - a.assentos_livres).slice(0, 10);
+        new Chart(document.getElementById("sessionOccupancyChart"), {
+            type: "bar",
+            data: { labels: sorted.map(s => s.titulo), datasets: [{ label: "Assentos", data: sorted.map(s => s.assentos_livres), backgroundColor: '#8b5cf6', borderRadius: 4 }] },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    }
+
+    function renderMoviesChart() {
+        new Chart(document.getElementById("moviesChart"), {
+            type: "bar",
+            data: { labels: filmesData.map(f => f.titulo), datasets: [{ label: "Minutos", data: filmesData.map(f => f.duracao_minutos), backgroundColor: '#3b82f6', borderRadius: 4 }] },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    }
+
+    function renderTicketsTable() {
+        const rows = ingressosData.map(t => {
+            const date = new Date(t.data_horario).toLocaleString("pt-BR", {dateStyle: 'short', timeStyle: 'short'});
+            const val = Number(t.preco_pago).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+            return `<tr><td>#${t.ingresso_id}</td><td>${t.titulo}</td><td>${t.sala} - ${t.poltrona}</td><td>${date}</td><td>${t.comprador}</td><td><span class="status-badge ${t.status_ingresso}">${t.status_ingresso}</span></td><td>${val}</td></tr>`;
+        }).join("");
+
+        document.getElementById("ticketsTable").innerHTML = `<table><thead><tr><th>ID</th><th>Filme</th><th>Local</th><th>Sessão</th><th>Cliente</th><th>Status</th><th>Valor</th></tr></thead><tbody>${rows}</tbody></table>`;
+    }
+
+    loadData();
+</script>
+</body>
+</html>
