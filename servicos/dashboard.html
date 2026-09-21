@@ -242,64 +242,19 @@
         return response.json();
     }
 
-// 1. Busca Filmes de forma independente
-    async function carregarFilmes() {
-        try {
-            const res = await fetch('http://localhost:7001/filmes');
-            const dados = await res.json();
-            
-            // Cole aqui a sua lógica de desenhar os filmes na tela!
-            // Exemplo: document.getElementById('sua_div_de_filmes').innerHTML = ...
-            
-        } catch (erro) {
-            console.error("Erro em Filmes:", erro);
-            // Mostra erro só nessa parte, sem quebrar o resto
-            document.getElementById('sua_div_de_filmes').innerHTML = "<p style='color:red;'>Serviço de filmes indisponível.</p>";
-        }
-    }
-
-    // 2. Busca Sessões de forma independente
-    async function carregarSessoes() {
-        try {
-            const res = await fetch('http://localhost:7002/sessoes');
-            const dados = await res.json();
-            
-            // Cole aqui a sua lógica de desenhar as sessões na tela!
-            
-        } catch (erro) {
-            console.error("Erro em Sessões:", erro);
-            document.getElementById('sua_div_de_sessoes').innerHTML = "<p style='color:red;'>Serviço de sessões indisponível.</p>";
-        }
-    }
-
-    // 3. Busca Ingressos de forma independente
-    async function carregarIngressos() {
-        try {
-            const res = await fetch('http://localhost:7003/ingressos');
-            const dados = await res.json();
-            
-            // Cole aqui a sua lógica de desenhar os ingressos na tela!
-            
-        } catch (erro) {
-            console.error("Erro em Ingressos:", erro);
-            document.getElementById('sua_div_de_ingressos').innerHTML = "<p style='color:red;'>Serviço de ingressos indisponível.</p>";
-        }
-    }
-
-    // Chama as 3 funções ao mesmo tempo assim que a página carrega
-    carregarFilmes();
-    carregarSessoes();
-    carregarIngressos();
     function updateCards() {
-        const validTickets = ingressosData.filter(i => i.status_ingresso !== 'CANCELADO');
-        document.getElementById("totalTickets").textContent = validTickets.length;
-        const totalRevenue = validTickets.reduce((sum, t) => sum + Number(t.preco_pago), 0);
-        document.getElementById("totalRevenue").textContent = totalRevenue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-        document.getElementById("fullSessionsCount").textContent = sessoesData.filter(s => s.status === 'LOTADA').length;
-        document.getElementById("activeMovies").textContent = filmesData.length;
+        try {
+            const validTickets = ingressosData.filter(i => i.status_ingresso !== 'CANCELADO');
+            document.getElementById("totalTickets").textContent = validTickets.length;
+            const totalRevenue = validTickets.reduce((sum, t) => sum + Number(t.preco_pago), 0);
+            document.getElementById("totalRevenue").textContent = totalRevenue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+            document.getElementById("fullSessionsCount").textContent = sessoesData.filter(s => s.status === 'LOTADA').length;
+            document.getElementById("activeMovies").textContent = filmesData.length;
+        } catch (e) { console.error("Erro nos cards:", e); }
     }
 
     function renderCarousel() {
+        if (!filmesData || filmesData.length === 0) return;
         const carouselHtml = filmesData.map(f => `
             <div class="poster-card" style="background-image: url('img/${f.filme_id}.jpg');">
                 <div class="poster-fallback">${f.titulo}</div>
@@ -309,6 +264,7 @@
     }
 
     function renderTicketsStatusChart() {
+        if (!ingressosData || ingressosData.length === 0) return;
         const statusCount = {};
         ingressosData.forEach(t => statusCount[t.status_ingresso] = (statusCount[t.status_ingresso] || 0) + 1);
         new Chart(document.getElementById("ticketsStatusChart"), {
@@ -319,6 +275,7 @@
     }
 
     function renderSessionOccupancyChart() {
+        if (!sessoesData || sessoesData.length === 0) return;
         const sorted = [...sessoesData].sort((a, b) => b.assentos_livres - a.assentos_livres).slice(0, 10);
         new Chart(document.getElementById("sessionOccupancyChart"), {
             type: "bar",
@@ -328,6 +285,7 @@
     }
 
     function renderMoviesChart() {
+        if (!filmesData || filmesData.length === 0) return;
         new Chart(document.getElementById("moviesChart"), {
             type: "bar",
             data: { labels: filmesData.map(f => f.titulo), datasets: [{ label: "Minutos", data: filmesData.map(f => f.duracao_minutos), backgroundColor: '#3b82f6', borderRadius: 4 }] },
@@ -336,6 +294,7 @@
     }
 
     function renderTicketsTable() {
+        if (!ingressosData || ingressosData.length === 0) return;
         const rows = ingressosData.map(t => {
             const date = new Date(t.data_horario).toLocaleString("pt-BR", {dateStyle: 'short', timeStyle: 'short'});
             const val = Number(t.preco_pago).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -345,6 +304,38 @@
         document.getElementById("ticketsTable").innerHTML = `<table><thead><tr><th>ID</th><th>Filme</th><th>Local</th><th>Sessão</th><th>Cliente</th><th>Status</th><th>Valor</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
+    async function loadData() {
+        // 1. Tenta carregar Filmes
+        try {
+            filmesData = await fetchJson(API.filmes);
+            renderCarousel();
+            renderMoviesChart();
+        } catch (error) {
+            document.getElementById("movieCarousel").innerHTML = "<p style='padding: 20px; color: #ef4444; font-weight: bold;'>Serviço de filmes indisponível.</p>";
+        }
+
+        // 2. Tenta carregar Sessões
+        try {
+            sessoesData = await fetchJson(API.sessoes);
+            renderSessionOccupancyChart();
+        } catch (error) {
+            console.error("Sessões indisponíveis");
+        }
+
+        // 3. Tenta carregar Ingressos
+        try {
+            ingressosData = await fetchJson(API.ingressos);
+            renderTicketsStatusChart();
+            renderTicketsTable();
+        } catch (error) {
+            document.getElementById("ticketsTable").innerHTML = "<p style='padding: 20px; color: #ef4444; font-weight: bold;'>Serviço de ingressos indisponível.</p>";
+        }
+
+        // 4. Atualiza os cards com os dados sobreviventes
+        updateCards();
+    }
+
+    // Inicia tudo
     loadData();
 </script>
 </body>
